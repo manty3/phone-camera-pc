@@ -1,0 +1,4 @@
+node_modules/
+latest-photo.jpg
+.env
+.DS_Store
