@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Phone Camera</title>
+
+    <style>
+        body {
+            margin: 0;
+            background: black;
+            color: white;
+            text-align: center;
+            font-family: Arial, sans-serif;
+        }
+
+        video {
+            width: 100%;
+            height: auto;
+            max-height: 85vh;
+            object-fit: contain;
+        }
+
+        #status {
+            padding: 10px;
+            font-size: 16px;
+        }
+
+        canvas {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="status">Connecting...</div>
+
+    <div style="padding:10px;">
+        <input id="roomInput" placeholder="Enter Room Code" maxlength="6"
+            style="padding:10px;font-size:18px;text-transform:uppercase;width:220px;">
+        <button id="connectBtn" style="padding:10px 18px;font-size:18px;">Connect</button>
+    </div>
+
+    <video id="camera" autoplay playsinline></video>
+
+    <canvas id="canvas"></canvas>
+
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script>
+        const socket = io();
+
+        const video = document.getElementById("camera");
+        const canvas = document.getElementById("canvas");
+        const status = document.getElementById("status");
+
+        let connectedRoom = null;
+
+        socket.on("connect", () => {
+            status.innerText = "Enter Room Code";
+        });
+
+        document.getElementById("connectBtn").addEventListener("click", connectToRoom);
+
+        function connectToRoom() {
+            const room = document.getElementById("roomInput").value.trim().toUpperCase();
+
+            if (!room || room.length < 4) {
+                status.innerText = "❌ Enter a valid Room Code";
+                return;
+            }
+
+            connectedRoom = room;
+            socket.emit("register", { device: "phone", room });
+            status.innerText = "✅ Phone Connected";
+            startCamera();
+        }
+
+        async function startCamera() {
+
+            try {
+
+                const stream =
+                    await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: {
+                                ideal: "environment"
+                            }
+                        },
+                        audio: false
+                    });
+
+                video.srcObject = stream;
+
+                status.innerText = "📷 Camera Ready";
+
+            } catch (error) {
+
+                console.error("Camera Error:", error);
+
+    status.innerText =
+        "❌ " + error.name + ": " + error.message;
+            }
+        }
+
+        socket.on("capture", () => {
+
+            capturePhoto();
+
+        });
+
+        function capturePhoto() {
+
+            if (!video.videoWidth) {
+                return;
+            }
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            const context = canvas.getContext("2d");
+
+            context.drawImage(
+                video,
+                0,
+                0,
+                canvas.width,
+                canvas.height
+            );
+
+            const photoData =
+                canvas.toDataURL("image/jpeg", 0.95);
+
+            socket.emit("photo", photoData);
+
+            status.innerText = "📸 Photo captured";
+        }
+    </script>
+
+</body>
+</html>
