@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Photo Capture System</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f2f2f2;
+            text-align: center;
+        }
+
+        .header {
+            background: #222;
+            color: white;
+            padding: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+
+        button {
+            border: none;
+            border-radius: 8px;
+            padding: 14px 25px;
+            font-size: 18px;
+            cursor: pointer;
+            margin: 8px;
+        }
+
+        .capture-btn {
+            background: #222;
+            color: white;
+            font-size: 22px;
+            padding: 18px 40px;
+        }
+
+        .capture-btn:hover {
+            background: #444;
+        }
+
+        .save-btn {
+            background: #555;
+            color: white;
+        }
+
+        .whatsapp-btn {
+            background: #25D366;
+            color: white;
+        }
+
+        .fixed-btn {
+            background: #128C7E;
+            color: white;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #status {
+            margin: 20px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .photo-container {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 25px;
+            min-height: 200px;
+        }
+
+        #photo {
+            max-width: 100%;
+            max-height: 600px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .whatsapp-section {
+            background: white;
+            margin-top: 25px;
+            padding: 25px;
+            border-radius: 12px;
+        }
+
+        input {
+            width: 350px;
+            max-width: 90%;
+            padding: 14px;
+            font-size: 17px;
+            border: 1px solid #ccc;
+            border-radius: 7px;
+        }
+
+        .hint {
+            color: #666;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>📷 Photo Capture System</h1>
+</div>
+
+<div class="container">
+
+    <div id="status">
+        Connecting...
+    </div>
+
+    <div style="background:white;padding:15px;border-radius:12px;margin-bottom:15px;">
+        <b>Room Code:</b> <span id="roomCode" style="font-size:22px;letter-spacing:2px;">----</span>
+        <div class="hint">Use this same code on the phone.</div>
+    </div>
+
+    <button
+        class="capture-btn"
+        onclick="capturePhoto()">
+        📸 CAPTURE PHOTO
+    </button>
+
+    <div class="photo-container">
+
+        <h2>Captured Photo</h2>
+
+        <img id="photo">
+
+        <br>
+
+        <button
+            id="saveBtn"
+            class="save-btn"
+            onclick="savePhoto()"
+            disabled>
+            💾 SAVE PHOTO
+        </button>
+
+    </div>
+
+
+    <div class="whatsapp-section">
+
+        <h2>📱 WhatsApp</h2>
+
+        <input
+            type="text"
+            id="whatsappNumber"
+            placeholder="Enter WhatsApp number">
+
+        <div class="hint">
+            Enter country code also. Example: 919876543210
+        </div>
+
+        <br>
+
+        <button
+            id="whatsappBtn"
+            class="whatsapp-btn"
+            onclick="sendWhatsApp()"
+            disabled>
+            📱 SEND TO WHATSAPP
+        </button>
+
+        <button
+            class="fixed-btn"
+            onclick="sendFixedWhatsApp()">
+            📱 FIXED NUMBER
+        </button>
+
+    </div>
+
+</div>
+
+
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+
+    const socket = io();
+
+    let capturedPhoto = null;
+
+    // Create one room code for this PC session.
+    const roomCode = getRoomCode();
+    document.getElementById("roomCode").innerText = roomCode;
+
+    function getRoomCode() {
+        const saved = sessionStorage.getItem("cameraRoomCode");
+        if (saved) return saved;
+
+        const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+        sessionStorage.setItem("cameraRoomCode", code);
+        return code;
+    }
+
+    // ==========================================
+    // FIXED WHATSAPP NUMBER
+    // ==========================================
+
+    const FIXED_WHATSAPP_NUMBER = "96369864929";
+
+
+    // ==========================================
+    // SOCKET CONNECTION
+    // ==========================================
+
+    socket.on("connect", () => {
+
+        document.getElementById("status").innerText =
+            "✅ PC Connected";
+
+        socket.emit("register", { device: "pc", room: roomCode });
+
+    });
+
+
+    // ==========================================
+    // CAPTURE PHOTO
+    // ==========================================
+
+    function capturePhoto() {
+
+        document.getElementById("status").innerText =
+            "📸 Requesting photo from phone...";
+
+        socket.emit("capture");
+
+    }
+
+
+    // ==========================================
+    // PHOTO RECEIVED
+    // ==========================================
+
+    socket.on("photo", (photoData) => {
+
+        capturedPhoto = photoData;
+
+        const photo =
+            document.getElementById("photo");
+
+        photo.src = photoData;
+
+        photo.style.display = "inline-block";
+
+
+        document.getElementById("saveBtn")
+            .disabled = false;
+
+        document.getElementById("whatsappBtn")
+            .disabled = false;
+
+
+        document.getElementById("status").innerText =
+            "✅ Photo received successfully";
+
+    });
+
+
+    // ==========================================
+    // SAVE PHOTO
+    // ==========================================
+
+    function savePhoto() {
+
+        if (!capturedPhoto) {
+
+            alert("Please capture a photo first.");
+
+            return;
+        }
+
+
+        const link =
+            document.createElement("a");
+
+        link.href = capturedPhoto;
+
+        const now = new Date();
+
+        const filename =
+            "photo_" +
+            now.getFullYear() +
+            "-" +
+            String(now.getMonth() + 1).padStart(2, "0") +
+            "-" +
+            String(now.getDate()).padStart(2, "0") +
+            "_" +
+            String(now.getHours()).padStart(2, "0") +
+            "-" +
+            String(now.getMinutes()).padStart(2, "0") +
+            "-" +
+            String(now.getSeconds()).padStart(2, "0") +
+            ".jpg";
+
+
+        link.download = filename;
+
+        link.click();
+
+    }
+
+
+    // ==========================================
+    // WHATSAPP - USER SELECTS CONTACT
+    // ==========================================
+
+    function sendWhatsApp() {
+
+        if (!capturedPhoto) {
+
+            alert("Please capture a photo first.");
+
+            return;
+        }
+
+
+        const number =
+            document.getElementById("whatsappNumber")
+                .value
+                .replace(/\D/g, "");
+
+
+        if (!number) {
+
+            alert("Please enter WhatsApp number.");
+
+            return;
+        }
+
+
+        const whatsappURL =
+            "https://web.whatsapp.com/send?phone=" +
+            number;
+
+
+        window.open(
+            whatsappURL,
+            "_blank"
+        );
+
+
+        setTimeout(() => {
+
+            alert(
+                "WhatsApp Web opened.\n\n" +
+                "Please attach the captured photo and send it."
+            );
+
+        }, 1500);
+
+    }
+
+
+    // ==========================================
+    // FIXED WHATSAPP NUMBER
+    // ==========================================
+
+    function sendFixedWhatsApp() {
+
+        if (!capturedPhoto) {
+
+            alert("Please capture a photo first.");
+
+            return;
+        }
+
+
+        const whatsappURL =
+            "https://web.whatsapp.com/send?phone=" +
+            FIXED_WHATSAPP_NUMBER;
+
+
+        window.open(
+            whatsappURL,
+            "_blank"
+        );
+
+
+        setTimeout(() => {
+
+            alert(
+                "Fixed WhatsApp chat opened.\n\n" +
+                "Please attach the captured photo and send it."
+            );
+
+        }, 1500);
+
+    }
+
+</script>
+
+</body>
+</html>
